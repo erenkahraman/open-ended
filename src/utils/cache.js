@@ -4,21 +4,24 @@ export class Cache {
     this.ttl = ttl * 1000; // Convert to milliseconds
   }
 
+  set(key, value) {
+    this.cache.set(key, {
+      value,
+      timestamp: Date.now()
+    });
+  }
+
   get(key) {
     const item = this.cache.get(key);
     if (!item) return null;
 
-    if (Date.now() > item.expiry) {
+    const now = Date.now();
+    if (now - item.timestamp > this.ttl) {
       this.cache.delete(key);
       return null;
     }
 
     return item.value;
-  }
-
-  set(key, value) {
-    const expiry = Date.now() + this.ttl;
-    this.cache.set(key, { value, expiry });
   }
 
   clear() {

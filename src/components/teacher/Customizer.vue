@@ -1,32 +1,49 @@
 <template>
   <div class="customizer-container">
+    <div v-if="error" class="error-banner">
+      {{ error }}
+      <button class="close-button" @click="error = null">&times;</button>
+    </div>
+
+    <div v-if="successMessage" class="success-banner">
+      {{ successMessage }}
+      <button class="close-button" @click="successMessage = ''">&times;</button>
+    </div>
+
     <div class="main-content">
       <div class="left-panel">
-        <div class="info-section">
+        <div class="card info-section">
           <div class="info-item">
-            Current Date and Time (UTC): 2025-01-09 11:39:03
+            Current Date and Time (UTC): {{ userStore.formattedDateTime }}
           </div>
-          <div class="info-item">Current User's Login: erenkahraman</div>
+          <div class="info-item">
+            Current User's Login: {{ userStore.currentUser }}
+          </div>
         </div>
 
-        <div class="sample-buttons">
+        <div class="card">
           <h3>Sample Questions</h3>
           <div class="button-group">
             <button
               v-for="question in sampleQuestions"
               :key="question.id"
               @click="loadSampleQuestion(question)"
-              class="sample-button"
+              class="button"
+              :disabled="isLoading"
             >
               Sample {{ question.id }}
             </button>
-            <button @click="resetForm" class="sample-button reset">
+            <button 
+              @click="resetForm" 
+              class="button danger"
+              :disabled="isLoading"
+            >
               Clear
             </button>
           </div>
         </div>
 
-        <div class="question-editor">
+        <div class="question-editor card">
           <div class="input-group">
             <label for="question">Question:</label>
             <textarea
@@ -34,8 +51,13 @@
               v-model="questionInput"
               placeholder="Enter your question here..."
               rows="3"
-              class="question-input"
+              class="textarea-input"
+              :class="{ 'error': validation.question }"
+              :disabled="isLoading"
             ></textarea>
+            <span v-if="validation.question" class="error-text">
+              {{ validation.question }}
+            </span>
           </div>
 
           <div class="input-group">
@@ -45,40 +67,37 @@
               v-model="correctAnswerInput"
               placeholder="Enter the correct answer here..."
               rows="4"
-              class="answer-input"
+              class="textarea-input"
+              :class="{ 'error': validation.correctAnswer }"
+              :disabled="isLoading"
             ></textarea>
+            <span v-if="validation.correctAnswer" class="error-text">
+              {{ validation.correctAnswer }}
+            </span>
           </div>
 
-          <div class="sample-answers">
-            <h3>Sample Answers</h3>
-            <div
-              v-for="(answer, index) in sampleAnswers"
-              :key="index"
-              class="sample-answer-item"
-            >
-              <textarea
-                v-model="answer.answer"
-                :placeholder="`Enter a ${answer.level.toLowerCase()} sample answer...`"
-                rows="3"
-                class="sample-answer-input"
-              ></textarea>
-            </div>
-          </div>
+          <SampleAnswers 
+            v-model="sampleAnswers" 
+            :selected-question-id="selectedQuestionId" 
+          />
         </div>
       </div>
 
       <div class="right-panel">
-        <div class="preview-section">
+        <div class="preview-wrapper card">
           <h2>Preview</h2>
-          <Player :preview-mode="true" :question="questionForPreview" />
+          <div class="preview-content">
+            <Player :preview-mode="true" :question="questionForPreview" />
+          </div>
         </div>
-        <div class="action-buttons">
+        <div class="action-buttons card">
           <button
             @click="assignQuestion"
             :disabled="!canAssign"
-            class="save-button"
+            class="button w-full"
+            :class="{ 'loading': isLoading }"
           >
-            Assign the Question
+            {{ isLoading ? 'Assigning...' : 'Assign the Question' }}
           </button>
         </div>
       </div>
@@ -87,15 +106,17 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { useQuestionStore } from "../../store";
+import { useUserStore } from "../../store/modules/user";
 import { sampleQuestions } from "../../store/modules/questions";
 import Player from "../student/Player.vue";
+import SampleAnswers from "./SampleAnswers.vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const emit = defineEmits(["switch-mode"]);
 const questionStore = useQuestionStore();
+const userStore = useUserStore();
 
 const questionInput = ref("");
 const correctAnswerInput = ref("");
@@ -105,289 +126,276 @@ const sampleAnswers = ref([
   { level: "Fair", score: 5.5, answer: "" },
 ]);
 
-watch(
-  [questionInput, correctAnswerInput, sampleAnswers],
-  () => {
-    questionStore.setPreviewQuestion({
-      question: questionInput.value,
-      correctAnswer: correctAnswerInput.value,
-      sampleAnswers: sampleAnswers.value,
-    });
-  },
-  { deep: true }
-);
+const error = ref(null);
+const isLoading = ref(false);
+const successMessage = ref("");
+const selectedQuestionId = ref(null);
 
-function loadSampleQuestion(question) {
-  questionInput.value = question.question;
-  correctAnswerInput.value = question.correctAnswer;
-  sampleAnswers.value = question.sampleAnswers.map((a) => ({ ...a }));
+// Form validation
+const validation = computed(() => {
+  const errors = {};
+  
+  if (!questionInput.value.trim()) {
+    errors.question = "Question is required";
+  } else if (questionInput.value.trim().length < 10) {
+    errors.question = "Question is too short";
+  }
+  
+  if (!correctAnswerInput.value.trim()) {
+    errors.correctAnswer = "Correct answer is required";
+  } else if (correctAnswerInput.value.trim().length < 20) {
+    errors.correctAnswer = "Correct answer should be more detailed";
+  }
+  
+  return errors;
+});
+
+const hasErrors = computed(() => Object.keys(validation.value).length > 0);
+
+const questionForPreview = computed(() => ({
+  id: Date.now(),
+  question: questionInput.value,
+  correctAnswer: correctAnswerInput.value,
+  sampleAnswers: sampleAnswers.value,
+}));
+
+async function loadSampleQuestion(question) {
+  try {
+    selectedQuestionId.value = question.id;
+    questionInput.value = question.question;
+    correctAnswerInput.value = question.correctAnswer;
+    sampleAnswers.value = question.sampleAnswers.map((a) => ({ ...a }));
+    error.value = null;
+    successMessage.value = "Sample question loaded successfully";
+    setTimeout(() => successMessage.value = "", 3000);
+  } catch (err) {
+    error.value = "Failed to load sample question";
+    console.error("Error loading sample question:", err);
+  }
 }
 
 const canAssign = computed(() => {
-  return (
-    questionInput.value.trim() &&
-    correctAnswerInput.value.trim() &&
-    sampleAnswers.value.every((a) => a.answer.trim())
-  );
-});
-
-const questionForPreview = computed(() => {
-  return {
-    question: questionInput.value,
-    correctAnswer: correctAnswerInput.value,
-    sampleAnswers: sampleAnswers.value,
-  };
+  return !hasErrors.value && !isLoading.value;
 });
 
 async function assignQuestion() {
   if (!canAssign.value) return;
+  
+  try {
+    isLoading.value = true;
+    error.value = null;
 
-  const newQuestion = {
-    question: questionInput.value,
-    correctAnswer: correctAnswerInput.value,
-    sampleAnswers: [...sampleAnswers.value],
-    createdBy: "erenkahraman",
-    createdAt: "2025-01-09 11:50:51",
-  };
+    const newQuestion = {
+      question: questionInput.value,
+      correctAnswer: correctAnswerInput.value,
+      sampleAnswers: sampleAnswers.value.filter(a => a.answer.trim()),
+      createdBy: userStore.currentUser,
+      createdAt: new Date().toISOString(),
+    };
 
-  questionStore.addQuestion(newQuestion);
-  await router.push("/student");
+    await questionStore.addQuestion(newQuestion);
+    successMessage.value = "Question assigned successfully";
+    await router.push("/student");
+  } catch (err) {
+    error.value = err.message || "Failed to assign question";
+    console.error("Error assigning question:", err);
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 function resetForm() {
-  questionInput.value = "";
-  correctAnswerInput.value = "";
-  sampleAnswers.value = sampleAnswers.value.map((answer) => ({
-    ...answer,
-    answer: "",
-  }));
+  try {
+    selectedQuestionId.value = null;
+    questionInput.value = "";
+    correctAnswerInput.value = "";
+    sampleAnswers.value = sampleAnswers.value.map((answer) => ({
+      ...answer,
+      answer: "",
+    }));
+    error.value = null;
+    successMessage.value = "Form reset successfully";
+    setTimeout(() => successMessage.value = "", 3000);
+  } catch (err) {
+    error.value = "Failed to reset form";
+    console.error("Error resetting form:", err);
+  }
 }
 </script>
 
 <style scoped>
 .customizer-container {
-  min-height: calc(100vh - 49px); /* tab yüksekliğini çıkardık */
-  padding: 1.5rem;
+  height: 100%;
+  padding: var(--spacing-md);
   background-color: var(--secondary-background);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .main-content {
   display: grid;
   grid-template-columns: 1fr 450px;
-  gap: 1.5rem;
+  gap: var(--spacing-md);
   max-width: 1600px;
   margin: 0 auto;
-  min-height: calc(100vh - 13rem);
+  flex: 1;
+  min-height: 0;
+  width: 100%;
 }
 
-.left-panel {
+.left-panel, .right-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--spacing-md);
+  height: 90%;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.right-panel {
-  position: sticky;
-  top: 1.5rem;
-  height: calc(100vh - 13rem);
-  display: flex;
-  flex-direction: column;
+.card {
+  background: var(--surface-color);
+  border-radius: 12px;
+  padding: var(--spacing-md);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .info-section {
-  background: var(--surface-color);
-  padding: 1.25rem;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  padding: var(--spacing-sm);
 }
 
-.info-item {
-  color: var(--text-color);
-  font-size: 0.875rem;
-  margin-bottom: 0.5rem;
-  opacity: 0.8;
+.info-section .info-item {
+  font-size: 0.8rem;
+  margin-bottom: var(--spacing-xs);
 }
 
-.info-item:last-child {
-  margin-bottom: 0;
-}
-
-.sample-buttons {
-  background: var(--surface-color);
-  padding: 1.25rem;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.sample-questions {
+  flex-shrink: 0;
 }
 
 .button-group {
   display: flex;
-  gap: 0.75rem;
   flex-wrap: wrap;
-  margin-top: 1rem;
+  gap: var(--spacing-xs);
 }
 
-.sample-button {
-  background: var(--primary-color);
-  border: none;
-  border-radius: 8px;
-  color: var(--button-text-color);
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 0.625rem 1rem;
-  transition: all 0.2s ease;
+.button-group .button {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.8rem;
 }
 
-.sample-button:hover:not(:disabled) {
-  background: var(--primary-hover-color);
-  transform: translateY(-1px);
-}
-
-.sample-button.reset {
-  background: var(--danger-color);
-}
-
-.sample-button.reset:hover {
-  background: var(--danger-hover-color);
+.question-editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  gap: var(--spacing-sm);
 }
 
 .input-group {
-  background: var(--surface-color);
-  padding: 1.25rem;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  margin-bottom: var(--spacing-sm);
 }
 
-label {
-  color: var(--text-color);
-  display: block;
-  font-weight: 500;
-  margin-bottom: 0.75rem;
-  font-size: 0.875rem;
+.input-group label {
+  font-size: 0.9rem;
+  margin-bottom: var(--spacing-xs);
 }
 
-.question-input,
-.answer-input,
-.sample-answer-input {
+.textarea-input {
   width: 100%;
-  background: var(--input-background);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-color);
-  font-size: 0.875rem;
-  line-height: 1.5;
-  padding: 0.875rem;
-  resize: vertical;
-  transition: all 0.2s ease;
+  min-height: 60px;
+  padding: var(--spacing-sm);
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
-.question-input {
-  min-height: 80px;
+.preview-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.answer-input {
+.preview-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.preview-content :deep(.player-container) {
+  height: 100%;
+  padding: var(--spacing-sm);
+}
+
+.preview-content :deep(.question-section) {
+  margin-bottom: var(--spacing-sm);
+}
+
+.preview-content :deep(.answer-input) {
   min-height: 100px;
 }
 
-.sample-answer-input {
-  min-height: 80px;
+h2, h3 {
+  font-size: 1rem;
+  margin-bottom: var(--spacing-sm);
 }
 
-.question-input:focus,
-.answer-input:focus,
-.sample-answer-input:focus {
-  border-color: var(--primary-color);
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+/* Sample Answers adjustments */
+:deep(.sample-answers) {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
 }
 
-.sample-answers {
-  background: var(--surface-color);
-  padding: 1.25rem;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+:deep(.answers-grid) {
+  gap: var(--spacing-sm);
 }
 
-.sample-answer-item {
-  margin-bottom: 1rem;
+:deep(.answer-group) {
+  padding: var(--spacing-sm);
 }
 
-.sample-answer-item:last-child {
-  margin-bottom: 0;
+:deep(.helper-text) {
+  font-size: 0.8rem;
+  margin-bottom: var(--spacing-sm);
 }
 
-h2,
-h3 {
-  color: var(--text-color);
-  margin: 0 0 1rem 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.preview-section {
-  background: var(--surface-color);
-  padding: 1.25rem;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  flex-grow: 1;
-  overflow-y: auto;
-  margin-bottom: 1rem;
-}
-
-.action-buttons {
-  background: var(--surface-color);
-  padding: 1.25rem;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.save-button {
-  width: 100%;
-  background: var(--primary-color);
-  border: none;
-  border-radius: 8px;
-  color: var(--button-text-color);
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 0.875rem 1.5rem;
-  transition: all 0.2s ease;
-}
-
-.save-button:hover:not(:disabled) {
-  background: var(--primary-hover-color);
-  transform: translateY(-1px);
-}
-
-.save-button:disabled {
-  background: var(--disabled-color);
-  cursor: not-allowed;
-  transform: none;
-  opacity: 0.7;
-}
-
+/* Make the grid layout more responsive */
 @media (max-width: 1200px) {
-  .main-content {
-    grid-template-columns: 1fr;
+  .customizer-container {
+    height: auto;
+    overflow: auto;
   }
 
-  .right-panel {
-    position: static;
+  .main-content {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .left-panel, .right-panel {
     height: auto;
+    overflow: visible;
+  }
+
+  .preview-wrapper {
+    height: 400px;
   }
 }
 
 @media (max-width: 640px) {
-  .customizer-container {
-    padding: 1rem;
+  .preview-wrapper {
+    height: 300px;
   }
 
-  .main-content {
-    gap: 1rem;
+  .textarea-input {
+    min-height: 50px;
   }
 
-  .left-panel {
-    gap: 1rem;
+  :deep(.answer-input) {
+    min-height: 80px;
   }
 }
 </style>

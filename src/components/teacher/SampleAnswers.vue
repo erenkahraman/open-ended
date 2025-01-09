@@ -1,8 +1,8 @@
 <template>
   <div class="sample-answers">
-    <h3>Sample Answers</h3>
+    <h3>Sample Answers (Optional)</h3>
     <p class="helper-text">
-      Provide sample answers for different proficiency levels
+      Select sample answers for different proficiency levels
     </p>
 
     <div class="answers-grid">
@@ -12,10 +12,30 @@
           <span class="level-range">{{ level.range }}/10</span>
         </div>
 
+        <div class="select-wrapper">
+          <select
+            v-model="answers[level.name]"
+            class="answer-select"
+            :class="{ error: showErrors && !answers[level.name] }"
+          >
+            <option value="">Select a sample answer...</option>
+            <option v-for="answer in getSampleAnswersForLevel(level.name)" 
+              :key="answer.answer"
+              :value="answer.answer"
+            >
+              {{ answer.answer }}
+            </option>
+          </select>
+          <div class="select-arrow"></div>
+        </div>
+
         <textarea
-          v-model="answers[level.name]"
-          :placeholder="`Enter a ${level.name.toLowerCase()} answer...`"
-          :class="{ error: showErrors && !answers[level.name] }"
+          v-if="answers[level.name]"
+          :value="answers[level.name]"
+          readonly
+          class="answer-display"
+          rows="3"
+          @click="handleTextareaClick"
         ></textarea>
 
         <span v-if="showErrors && !answers[level.name]" class="error-message">
@@ -28,12 +48,17 @@
 
 <script setup>
 import { ref, watch } from "vue";
+import { sampleQuestions } from "../../store/modules/questions";
 
 const props = defineProps({
   modelValue: {
     type: Array,
     default: () => [],
   },
+  selectedQuestionId: {
+    type: Number,
+    default: null
+  }
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -41,13 +66,29 @@ const emit = defineEmits(["update:modelValue"]);
 const answerLevels = [
   { name: "Excellent", range: "9-10", defaultScore: 9.5 },
   { name: "Good", range: "7-8", defaultScore: 7.5 },
-  { name: "Fair", range: "5-6", defaultScore: 5.5 },
-  { name: "Poor", range: "3-4", defaultScore: 3.5 },
-  { name: "Very Poor", range: "0-2", defaultScore: 1.5 },
+  { name: "Fair", range: "5-6", defaultScore: 5.5 }
 ];
 
 const answers = ref({});
 const showErrors = ref(false);
+
+function handleTextareaClick(event) {
+  event.target.select();
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Failed to copy text:', err);
+  }
+}
+
+function getSampleAnswersForLevel(level) {
+  if (!props.selectedQuestionId) return [];
+  
+  const selectedQuestion = sampleQuestions.find(q => q.id === props.selectedQuestionId);
+  if (!selectedQuestion) return [];
+
+  return selectedQuestion.sampleAnswers.filter(a => a.level === level);
+}
 
 // Initialize answers from props
 watch(
@@ -59,6 +100,16 @@ watch(
     });
   },
   { immediate: true }
+);
+
+// Reset answers when question changes
+watch(
+  () => props.selectedQuestionId,
+  () => {
+    answerLevels.forEach((level) => {
+      answers.value[level.name] = "";
+    });
+  }
 );
 
 // Update parent when answers change
@@ -85,12 +136,13 @@ watch(
 <style scoped>
 .sample-answers {
   margin-top: 2rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border-color);
   padding-top: 2rem;
 }
 
 .helper-text {
-  color: #64748b;
+  color: var(--text-color);
+  opacity: 0.7;
   font-size: 0.875rem;
   margin-bottom: 1.5rem;
 }
@@ -101,53 +153,102 @@ watch(
 }
 
 .answer-group {
-  background: #f8fafc;
+  background: var(--surface-color);
   padding: 1rem;
   border-radius: 8px;
+  border: 1px solid var(--border-color);
 }
 
 .level-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .level-name {
   font-weight: 500;
-  color: #334155;
+  color: var(--text-color);
 }
 
 .level-range {
-  color: #64748b;
+  color: var(--text-color);
+  opacity: 0.7;
   font-size: 0.875rem;
 }
 
-textarea {
+.select-wrapper {
+  position: relative;
   width: 100%;
-  min-height: 100px;
+}
+
+.answer-select {
+  width: 100%;
   padding: 0.75rem;
-  border: 2px solid #e2e8f0;
+  padding-right: 2.5rem;
+  background: var(--input-background);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  resize: vertical;
+  color: var(--text-color);
   font-size: 0.875rem;
+  appearance: none;
+  cursor: pointer;
   transition: all 0.3s ease;
 }
 
-textarea:focus {
+.answer-select:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-textarea.error {
-  border-color: #ef4444;
+.answer-select.error {
+  border-color: var(--danger-color);
+}
+
+.select-arrow {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--text-color);
+  pointer-events: none;
 }
 
 .error-message {
-  color: #ef4444;
+  color: var(--danger-color);
   font-size: 0.75rem;
   margin-top: 0.25rem;
+  display: block;
+}
+
+.answer-display {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--input-background);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-color);
+  font-size: 0.875rem;
+  resize: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.answer-display:hover {
+  background: var(--surface-color);
+  border-color: var(--primary-color);
+}
+
+.answer-display:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 @media (min-width: 768px) {

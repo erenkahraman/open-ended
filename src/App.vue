@@ -16,7 +16,9 @@
         Student
       </router-link>
     </nav>
-    <router-view></router-view>
+    <div class="router-view-container">
+      <router-view></router-view>
+    </div>
   </div>
 </template>
 
@@ -81,40 +83,47 @@ body {
 }
 
 .app-container {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .navigation-tabs {
-  background-color: var(--surface-color);
-  padding: 1rem 2rem 0;
+  height: 49px; /* Fixed navbar height */
   display: flex;
-  gap: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
+  gap: 1px;
+  background-color: var(--tab-inactive-background);
+  flex-shrink: 0; /* Prevent navbar from shrinking */
 }
 
 .tab-link {
-  padding: 0.75rem 2rem;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
   color: var(--text-color);
   text-decoration: none;
-  border-radius: 8px 8px 0 0;
   font-weight: 500;
-  font-size: 0.875rem;
+  background: var(--tab-inactive-background);
   transition: all 0.2s ease;
-  background-color: var(--tab-inactive-background);
-  position: relative;
-  bottom: -1px;
 }
 
 .tab-link:hover {
-  background-color: var(--tab-active-background);
+  background: var(--tab-active-background);
 }
 
 .tab-link.active {
-  background-color: var(--tab-active-background);
-  border: 1px solid var(--border-color);
-  border-bottom-color: var(--tab-active-background);
+  background: var(--tab-active-background);
+  color: var(--primary-color);
+}
+
+/* Router view container */
+.router-view-container {
+  flex: 1;
+  min-height: 0; /* Important for nested flex scrolling */
+  overflow: hidden;
 }
 
 * {
