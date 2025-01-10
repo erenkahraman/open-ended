@@ -4,7 +4,6 @@ export const CONFIG = {
 
   // Model settings
   MODEL_NAME: 'Xenova/all-MiniLM-L6-v2',
-  FALLBACK_MODEL: 'Xenova/all-mpnet-base-v2',
   
   // Evaluation settings
   SIMILARITY_WEIGHT: 0.7,
@@ -12,9 +11,15 @@ export const CONFIG = {
   MIN_SCORE: 0,
   MAX_SCORE: 100,
   
-  // Thresholds
-  EXCELLENT_THRESHOLD: 90,
-  GOOD_THRESHOLD: 75,
-  FAIR_THRESHOLD: 60,
-  POOR_THRESHOLD: 40,
+  // Score thresholds
+  THRESHOLDS: {
+    EXCELLENT: 90,
+    GOOD: 75,
+    FAIR: 60,
+    POOR: 40
+  },
+
+  // Text validation
+  MIN_TEXT_LENGTH: 10,
+  MIN_WORDS: 5
 };

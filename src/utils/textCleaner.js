@@ -1,9 +1,25 @@
+const PUNCTUATION_REGEX = /[^\w\s.,!?-]/g;
+const WHITESPACE_REGEX = /\s+/g;
+
 export function cleanText(text) {
-  if (!text) return '';
+  if (!text?.trim()) return '';
   
   return text
     .trim()
-    .replace(/\s+/g, ' ')        // normalize whitespace
-    .replace(/[^\w\s.,!?-]/g, '') // remove special characters except basic punctuation
-    .replace(/\s+/g, ' ');       // normalize whitespace again
+    .toLowerCase()
+    .replace(WHITESPACE_REGEX, ' ')
+    .replace(PUNCTUATION_REGEX, '')
+    .replace(WHITESPACE_REGEX, ' ')
+    .trim();
+}
+
+export function countWords(text) {
+  return text?.trim() ? text.trim().split(/\s+/).length : 0;
+}
+
+export function validateText(text, minLength = 10, minWords = 5) {
+  if (!text?.trim()) return false;
+  
+  const cleaned = cleanText(text);
+  return cleaned.length >= minLength && countWords(cleaned) >= minWords;
 }

@@ -1,7 +1,8 @@
 export class Cache {
   constructor(ttl = 3600) {
     this.cache = new Map();
-    this.ttl = ttl * 1000; // Convert to milliseconds
+    this.ttl = ttl;
+    this.cleanupInterval = setInterval(() => this.cleanup(), ttl);
   }
 
   set(key, value) {
@@ -15,8 +16,7 @@ export class Cache {
     const item = this.cache.get(key);
     if (!item) return null;
 
-    const now = Date.now();
-    if (now - item.timestamp > this.ttl) {
+    if (Date.now() - item.timestamp > this.ttl) {
       this.cache.delete(key);
       return null;
     }
@@ -24,7 +24,21 @@ export class Cache {
     return item.value;
   }
 
+  cleanup() {
+    const now = Date.now();
+    for (const [key, item] of this.cache.entries()) {
+      if (now - item.timestamp > this.ttl) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
   clear() {
     this.cache.clear();
+  }
+
+  destroy() {
+    clearInterval(this.cleanupInterval);
+    this.clear();
   }
 }

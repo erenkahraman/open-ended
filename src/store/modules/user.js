@@ -6,11 +6,12 @@ export const useUserStore = defineStore("user", {
     currentDateTime: "",
     isTeacher: false,
     error: null,
-    isLoading: false
+    isLoading: false,
+    lastActivity: null
   }),
 
   getters: {
-    formattedDateTime: (state) => {
+    formattedDateTime: state => {
       if (!state.currentDateTime) return "";
       return new Date(state.currentDateTime).toLocaleString("en-US", {
         timeZone: "UTC",
@@ -20,19 +21,29 @@ export const useUserStore = defineStore("user", {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-        hour12: false,
+        hour12: false
       }) + " UTC";
     },
     
-    isAuthenticated: (state) => !!state.currentUser,
+    isAuthenticated: state => Boolean(state.currentUser),
+    isSessionActive: state => {
+      if (!state.lastActivity) return false;
+      const inactiveTime = Date.now() - state.lastActivity;
+      return inactiveTime < 30 * 60 * 1000; // 30 minutes
+    }
   },
 
   actions: {
     async initializeUser(username) {
+      if (!username?.trim()) {
+        throw new Error("Username is required");
+      }
+
       try {
         this.isLoading = true;
         this.error = null;
-        this.currentUser = username;
+        this.currentUser = username.trim();
+        this.lastActivity = Date.now();
         await this.updateDateTime();
       } catch (error) {
         this.error = error.message;
@@ -51,8 +62,12 @@ export const useUserStore = defineStore("user", {
       }
     },
 
+    updateActivity() {
+      this.lastActivity = Date.now();
+    },
+
     setUserRole(isTeacher) {
-      this.isTeacher = isTeacher;
+      this.isTeacher = Boolean(isTeacher);
     },
 
     clearError() {
@@ -64,6 +79,7 @@ export const useUserStore = defineStore("user", {
       this.isTeacher = false;
       this.currentDateTime = "";
       this.error = null;
+      this.lastActivity = null;
     }
-  },
+  }
 });

@@ -2,35 +2,49 @@
   <div class="app-container">
     <nav class="navigation-tabs">
       <router-link
-        to="/teacher"
+        v-for="route in routes"
+        :key="route.path"
+        :to="route.path"
         class="tab-link"
-        :class="{ active: currentRoute === '/teacher' }"
+        :class="{ active: currentRoute === route.path }"
       >
-        Teacher
-      </router-link>
-      <router-link
-        to="/student"
-        class="tab-link"
-        :class="{ active: currentRoute === '/student' }"
-      >
-        Student
+        {{ route.name }}
       </router-link>
     </nav>
     <div class="router-view-container">
-      <router-view></router-view>
+      <Suspense>
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </Suspense>
     </div>
   </div>
 </template>
 
 <script setup>
-import { useQuestionStore } from "./store";
-import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useUserStore } from "./store/modules/user";
 
-const questionStore = useQuestionStore();
 const route = useRoute();
+const router = useRouter();
+const userStore = useUserStore();
 
 const currentRoute = computed(() => route.path);
+
+const routes = [
+  { path: '/teacher', name: 'Teacher' },
+  { path: '/student', name: 'Student' }
+];
+
+// Update activity timestamp on route change
+onMounted(() => {
+  router.afterEach(() => {
+    userStore.updateActivity();
+  });
+});
 </script>
 
 <style>
@@ -48,23 +62,46 @@ const currentRoute = computed(() => route.path);
   --secondary-background: #f1f5f9;
   --tab-active-background: #ffffff;
   --tab-inactive-background: #e2e8f0;
+  --success-color: #22c55e;
+  --success-hover-color: #16a34a;
+  --warning-color: #f59e0b;
+  --warning-hover-color: #d97706;
+  --success-background: rgba(34, 197, 94, 0.1);
+  --primary-background: rgba(52, 152, 219, 0.1);
+  --warning-background: rgba(245, 158, 11, 0.1);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --surface-color: #1a202c;
     --text-color: #e2e8f0;
-    --primary-color: #3498db;
-    --primary-hover-color: #2980b9;
-    --danger-color: #e74c3c;
-    --danger-hover-color: #c0392b;
-    --disabled-color: #4a5568;
-    --border-color: #2d3748;
     --input-background: #2d3748;
-    --button-text-color: #ffffff;
+    --border-color: #2d3748;
     --secondary-background: #1e293b;
     --tab-active-background: #2d3748;
     --tab-inactive-background: #1a202c;
+    --success-background: rgba(34, 197, 94, 0.05);
+    --primary-background: rgba(52, 152, 219, 0.05);
+    --warning-background: rgba(245, 158, 11, 0.05);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
   }
 }
 
@@ -90,11 +127,11 @@ body {
 }
 
 .navigation-tabs {
-  height: 49px; /* Fixed navbar height */
+  height: 49px;
   display: flex;
   gap: 1px;
   background-color: var(--tab-inactive-background);
-  flex-shrink: 0; /* Prevent navbar from shrinking */
+  flex-shrink: 0;
 }
 
 .tab-link {
@@ -119,11 +156,20 @@ body {
   color: var(--primary-color);
 }
 
-/* Router view container */
 .router-view-container {
   flex: 1;
-  min-height: 0; /* Important for nested flex scrolling */
+  min-height: 0;
   overflow: hidden;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 * {
@@ -132,12 +178,12 @@ body {
 
 @media (max-width: 640px) {
   .navigation-tabs {
-    padding: 1rem 1rem 0;
+    padding: 0.5rem 0.5rem 0;
   }
 
   .tab-link {
     padding: 0.75rem 1rem;
-    font-size: 0.813rem;
+    font-size: 0.875rem;
   }
 }
 </style>

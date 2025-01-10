@@ -5,36 +5,53 @@ import { CONFIG } from '../config/config';
 const DEBUG = true;
 const log = (...args) => DEBUG && console.log('[SemanticService]', ...args);
 
+const MODEL_CONFIG = {
+  primary: 'Xenova/all-MiniLM-L6-v2',
+  fallback: 'Xenova/all-mpnet-base-v2',
+  maxRetries: 3,
+  retryDelay: 1000,
+  timeout: 30000
+};
+
 class SemanticService {
   constructor() {
     this.cache = new Cache(CONFIG.CACHE_TTL);
     this.model = null;
     this.modelPromise = null;
     this.isInitializing = false;
-    log('Initializing service');
+    this.retryCount = 0;
+    this.currentModelName = MODEL_CONFIG.primary;
     this.initModel();
   }
 
   async initModel() {
     try {
-      log('Starting model initialization');
       await this.ensureModel();
     } catch (error) {
       log('Model initialization failed:', error);
+      if (this.retryCount < MODEL_CONFIG.maxRetries) {
+        this.retryCount++;
+        log(`Retrying initialization (${this.retryCount}/${MODEL_CONFIG.maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, MODEL_CONFIG.retryDelay));
+        await this.initModel();
+      } else if (this.currentModelName === MODEL_CONFIG.primary) {
+        log('Switching to fallback model...');
+        this.currentModelName = MODEL_CONFIG.fallback;
+        this.retryCount = 0;
+        await this.initModel();
+      }
     }
   }
 
   async ensureModel() {
-    if (this.model) {
-      return this.model;
-    }
-
-    if (this.modelPromise) {
-      return this.modelPromise;
-    }
-
+    if (this.model) return this.model;
+    if (this.modelPromise) return this.modelPromise;
     if (this.isInitializing) {
+      const startTime = Date.now();
       while (this.isInitializing) {
+        if (Date.now() - startTime > MODEL_CONFIG.timeout) {
+          throw new Error('Model initialization timeout');
+        }
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       return this.model;
@@ -42,39 +59,26 @@ class SemanticService {
 
     try {
       this.isInitializing = true;
-      log('Loading model...');
+      log(`Loading model: ${this.currentModelName}`);
 
-      // Attempt to load the primary model from a local directory
-      try {
-        this.modelPromise = pipeline(
-          'feature-extraction', 
-          '/models/all-MiniLM-L6-v2/', // Local path to the model directory
-          {
-            progress_callback: (progress) => {
-              const pct = (typeof progress === 'number') ? Math.round(progress * 100) : 0;
-              log(`Loading progress: ${pct}%`);
-            }
+      this.modelPromise = pipeline('feature-extraction', this.currentModelName, {
+        quantized: true,
+        progress_callback: progress => {
+          if (typeof progress === 'number') {
+            const pct = Math.round(progress * 100);
+            log(`Loading progress: ${pct}%`);
           }
-        );
-        this.model = await this.modelPromise;
-        log('Primary model loaded successfully');
-      } catch (primaryError) {
-        log('Primary model load failed, attempting fallback:', primaryError);
-        // Attempt loading fallback model from another local directory
-        this.modelPromise = pipeline(
-          'feature-extraction', 
-          '/models/all-mpnet-base-v2/', // Local path to fallback model directory
-          {
-            progress_callback: (progress) => {
-              const pct = (typeof progress === 'number') ? Math.round(progress * 100) : 0;
-              log(`Fallback loading progress: ${pct}%`);
-            }
-          }
-        );
-        this.model = await this.modelPromise;
-        log('Fallback model loaded successfully');
-      }
+        }
+      });
 
+      this.model = await Promise.race([
+        this.modelPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Model loading timeout')), MODEL_CONFIG.timeout)
+        )
+      ]);
+
+      log('Model loaded successfully');
       return this.model;
     } catch (error) {
       log('Error loading model:', error);
@@ -87,29 +91,18 @@ class SemanticService {
   }
 
   async getEmbedding(text) {
-    if (!text || typeof text !== 'string') {
-      log('Invalid text input');
-      return null;
-    }
+    if (!text?.trim()) return null;
 
     const cacheKey = `emb_${text}`;
     const cached = this.cache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    if (cached) return cached;
 
     try {
       const model = await this.ensureModel();
-      if (!model) {
-        log('Model not available');
-        return null;
-      }
+      if (!model) return null;
 
       const output = await model(text, { pooling: 'mean', normalize: true });
-      if (!output || !output.data) {
-        log('Invalid model output');
-        return null;
-      }
+      if (!output?.data) return null;
 
       const embedding = Array.from(output.data);
       this.cache.set(cacheKey, embedding);
@@ -121,59 +114,43 @@ class SemanticService {
   }
 
   cosineSimilarity(vecA, vecB) {
-    if (!vecA || !vecB || vecA.length !== vecB.length) {
-      return 0;
-    }
+    if (!vecA?.length || !vecB?.length || vecA.length !== vecB.length) return 0;
 
     try {
       const dotProduct = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
       const magA = Math.sqrt(vecA.reduce((sum, x) => sum + x * x, 0));
       const magB = Math.sqrt(vecB.reduce((sum, x) => sum + x * x, 0));
       
-      if (!magA || !magB) return 0;
-      return dotProduct / (magA * magB);
-    } catch (error) {
-      log('Error calculating similarity:', error);
+      return (!magA || !magB) ? 0 : dotProduct / (magA * magB);
+    } catch {
       return 0;
     }
   }
 
   async evaluateAnswer(studentAnswer, correctAnswer, question) {
-    if (!studentAnswer || !correctAnswer) {
-      log('Missing required answers');
-      return 0;
-    }
+    if (!studentAnswer?.trim() || !correctAnswer?.trim()) return 0;
 
     const cacheKey = `score_${studentAnswer}_${correctAnswer}_${question || ''}`;
     const cached = this.cache.get(cacheKey);
-    if (cached !== undefined) {
-      return cached;
-    }
+    if (cached !== undefined) return cached;
 
     try {
-      // Get embeddings
       const [studentEmbed, correctEmbed, questionEmbed] = await Promise.all([
         this.getEmbedding(studentAnswer),
         this.getEmbedding(correctAnswer),
-        question ? this.getEmbedding(question) : Promise.resolve(null)
+        question ? this.getEmbedding(question) : null
       ]);
 
-      if (!studentEmbed || !correctEmbed) {
-        log('Failed to generate embeddings');
-        return 0;
-      }
+      if (!studentEmbed || !correctEmbed) return 0;
 
-      // Calculate base similarity
       let score = this.cosineSimilarity(studentEmbed, correctEmbed);
-
-      // Consider question context if available
+      
       if (questionEmbed) {
         const questionRelevance = this.cosineSimilarity(studentEmbed, questionEmbed);
-        score = score * 0.7 + questionRelevance * 0.3;
+        score = score * CONFIG.SIMILARITY_WEIGHT + questionRelevance * CONFIG.RELEVANCE_WEIGHT;
       }
 
-      // Scale to percentage and ensure valid range
-      const finalScore = Math.min(Math.max(score * 100, 0), 100);
+      const finalScore = Math.min(Math.max(score * 10, CONFIG.MIN_SCORE), CONFIG.MAX_SCORE);
       this.cache.set(cacheKey, finalScore);
       return finalScore;
     } catch (error) {
@@ -183,7 +160,6 @@ class SemanticService {
   }
 }
 
-// Export singleton instance
 const service = new SemanticService();
 
 export const evaluateAnswer = async (studentAnswer, correctAnswer, question) => {

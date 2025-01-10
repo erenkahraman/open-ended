@@ -12,35 +12,27 @@
           <span class="level-range">{{ level.range }}/10</span>
         </div>
 
-        <div class="select-wrapper">
-          <select
-            v-model="answers[level.name]"
-            class="answer-select"
-            :class="{ error: showErrors && !answers[level.name] }"
-          >
-            <option value="">Select a sample answer...</option>
-            <option v-for="answer in getSampleAnswersForLevel(level.name)" 
-              :key="answer.answer"
-              :value="answer.answer"
-            >
-              {{ answer.answer }}
-            </option>
-          </select>
-          <div class="select-arrow"></div>
-        </div>
+        <BaseInput
+          v-model="answers[level.name]"
+          type="select"
+          :options="getSampleAnswersForLevel(level.name)"
+          option-label="answer"
+          option-value="answer"
+          placeholder="Select a sample answer..."
+          :error-message="showErrors && !answers[level.name] ? 'Required for complete evaluation' : ''"
+          @focus="handleDropdownFocus(level.name)"
+          @blur="handleDropdownBlur"
+        />
 
-        <textarea
+        <BaseInput
           v-if="answers[level.name]"
-          :value="answers[level.name]"
+          :model-value="answers[level.name]"
+          type="textarea"
+          :rows="3"
           readonly
-          class="answer-display"
-          rows="3"
           @click="handleTextareaClick"
-        ></textarea>
-
-        <span v-if="showErrors && !answers[level.name]" class="error-message">
-          Required for complete evaluation
-        </span>
+          class="answer-display"
+        />
       </div>
     </div>
   </div>
@@ -49,6 +41,7 @@
 <script setup>
 import { ref, watch } from "vue";
 import { sampleQuestions } from "../../store/modules/questions";
+import { BaseInput } from "../shared";
 
 const props = defineProps({
   modelValue: {
@@ -71,8 +64,25 @@ const answerLevels = [
 
 const answers = ref({});
 const showErrors = ref(false);
+const activeDropdown = ref(null);
+
+function handleDropdownFocus(levelName) {
+  if (activeDropdown.value && activeDropdown.value !== levelName) {
+    // Close other dropdowns
+    const event = new Event('blur');
+    document.querySelector(`[data-level="${activeDropdown.value}"]`)?.dispatchEvent(event);
+  }
+  activeDropdown.value = levelName;
+}
+
+function handleDropdownBlur() {
+  setTimeout(() => {
+    activeDropdown.value = null;
+  }, 200);
+}
 
 function handleTextareaClick(event) {
+  if (!event.target) return;
   event.target.select();
   try {
     document.execCommand('copy');
@@ -109,6 +119,7 @@ watch(
     answerLevels.forEach((level) => {
       answers.value[level.name] = "";
     });
+    activeDropdown.value = null;
   }
 );
 
@@ -122,10 +133,10 @@ watch(
         return {
           level,
           answer,
-          score: levelConfig.defaultScore,
+          score: levelConfig?.defaultScore || 0,
         };
       })
-      .filter((answer) => answer.answer.trim());
+      .filter((answer) => answer.answer?.trim());
 
     emit("update:modelValue", formattedAnswers);
   },
@@ -135,35 +146,46 @@ watch(
 
 <style scoped>
 .sample-answers {
-  margin-top: 2rem;
-  border-top: 1px solid var(--border-color);
-  padding-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
 }
 
 .helper-text {
   color: var(--text-color);
   opacity: 0.7;
-  font-size: 0.875rem;
-  margin-bottom: 1.5rem;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-md);
 }
 
 .answers-grid {
-  display: grid;
-  gap: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  overflow-y: auto;
+  padding-right: var(--spacing-sm);
 }
 
 .answer-group {
   background: var(--surface-color);
-  padding: 1rem;
-  border-radius: 8px;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .level-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: var(--spacing-sm);
 }
 
 .level-name {
@@ -174,86 +196,37 @@ watch(
 .level-range {
   color: var(--text-color);
   opacity: 0.7;
-  font-size: 0.875rem;
-}
-
-.select-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-.answer-select {
-  width: 100%;
-  padding: 0.75rem;
-  padding-right: 2.5rem;
-  background: var(--input-background);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-color);
-  font-size: 0.875rem;
-  appearance: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.answer-select:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.answer-select.error {
-  border-color: var(--danger-color);
-}
-
-.select-arrow {
-  position: absolute;
-  right: 1rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid var(--text-color);
-  pointer-events: none;
-}
-
-.error-message {
-  color: var(--danger-color);
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
-  display: block;
+  font-size: var(--font-size-sm);
 }
 
 .answer-display {
-  width: 100%;
-  margin-top: 0.5rem;
-  padding: 0.75rem;
-  background: var(--input-background);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-color);
-  font-size: 0.875rem;
-  resize: none;
+  margin-top: var(--spacing-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .answer-display:hover {
-  background: var(--surface-color);
   border-color: var(--primary-color);
 }
 
-.answer-display:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+.answer-display :deep(textarea) {
+  height: 80px;
+  max-height: 80px;
+  resize: none;
+  overflow-y: auto;
 }
 
-@media (min-width: 768px) {
+@media (max-width: 640px) {
   .answers-grid {
-    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+
+  .answer-group {
+    padding: var(--spacing-sm);
+  }
+  
+  .answer-display :deep(textarea) {
+    height: 60px;
+    max-height: 60px;
   }
 }
 </style>
