@@ -9,7 +9,7 @@
       >
         <template #preview-actions>
           <BaseButton
-            @click="$emit('assign')"
+            @click="handleAssign"
             :disabled="!canAssign"
             :loading="isLoading"
             block
@@ -27,13 +27,18 @@
 import { BaseButton } from "../shared";
 import Player from "../student/Player.vue";
 
-defineProps({
+const props = defineProps({
   question: { type: Object, required: true },
   canAssign: { type: Boolean, default: false },
   isLoading: { type: Boolean, default: false }
 });
 
-defineEmits(['assign']);
+const emit = defineEmits(['assign']);
+
+const handleAssign = () => {
+  localStorage.setItem('currentQuestion', JSON.stringify(props.question));
+  emit('assign');
+};
 </script>
 
 <style scoped>
