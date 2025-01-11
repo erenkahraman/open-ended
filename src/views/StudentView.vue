@@ -4,9 +4,10 @@
       v-if="currentQuestion.question"
       :question="currentQuestion"
       @submit="handleSubmit"
+      class="main-content"
     />
-    <div v-else class="loading-state">
-      No question available
+    <div v-else class="main-content waiting">
+      Waiting for question...
     </div>
   </div>
 </template>
@@ -60,17 +61,34 @@ const handleSubmit = async (submission) => {
 
 <style scoped>
 .student-view {
-  height: 100vh;
-  width: 100%;
-  padding: var(--spacing-lg);
-}
-
-.loading-state {
+  min-height: 100vh;
+  padding: 2rem;
+  background: var(--background-color);
   display: flex;
   justify-content: center;
-  align-items: center;
-  height: 100%;
-  font-size: var(--font-size-lg);
-  color: var(--color-text-secondary);
+}
+
+.main-content {
+  width: 100%;
+  max-width: 800px;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.waiting {
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  .student-view {
+    padding: 1rem;
+  }
+  
+  .main-content {
+    padding: 1.5rem;
+  }
 }
 </style>
