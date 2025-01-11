@@ -7,7 +7,7 @@
         type="textarea"
         :rows="6"
         readonly
-        disabled
+        :disabled="true"
         :placeholder="'No question provided'"
       />
     </div>
@@ -18,7 +18,7 @@
         v-model="answer"
         type="textarea"
         :rows="6"
-        :disabled="isSubmitted || isLoading || (previewMode && question.correctAnswer)"
+        :disabled="isSubmitted || isLoading || disableQuestion"
         :readonly="previewMode"
         :placeholder="placeholder"
       />
@@ -43,6 +43,7 @@
       :score="score"
       :current-date-time="submittedAt"
       :current-user="userStore.currentUser"
+      @close="resetScore"
     />
   </div>
 </template>
@@ -54,7 +55,13 @@ import ScoreDisplay from "./ScoreDisplay.vue";
 import { useAnswerSubmission } from "../../composables/useAnswerSubmission";
 
 const props = defineProps({
-  question: { type: Object, required: true },
+  question: { 
+    type: Object, 
+    required: true,
+    validator: (value) => {
+      return value && typeof value.question === 'string';
+    }
+  },
   previewMode: { type: Boolean, default: false },
   disableQuestion: { type: Boolean, default: false }
 });
@@ -70,7 +77,8 @@ const {
   isSubmitted,
   canSubmit,
   placeholder,
-  submit
+  submit,
+  resetScore
 } = useAnswerSubmission(props, emit);
 </script>
 
