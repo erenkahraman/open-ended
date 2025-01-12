@@ -1,11 +1,11 @@
 <template>
-  <div class="score-display-overlay" @click.self="$emit('close')" role="dialog" aria-labelledby="score-title">
+  <dialog class="score-display-overlay" @click.self="$emit('close')" aria-labelledby="score-title" open>
     <div class="score-display-content">
       <div class="score-header">
         <h2 id="score-title">Your Score</h2>
-        <div class="score-value" :class="scoreClass" role="status" aria-live="polite">
+        <output class="score-value" :class="scoreClass" for="score-title">
           {{ formattedScore }}
-        </div>
+        </output>
       </div>
 
       <div class="score-details">
@@ -28,7 +28,7 @@
         Close
       </BaseButton>
     </div>
-  </div>
+  </dialog>
 </template>
 
 <script setup>

@@ -1,4 +1,3 @@
-// src/data/questions.js
 export const sampleQuestions = [
   {
     id: 1,
