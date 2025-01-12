@@ -52,7 +52,7 @@
       <div v-if="type === 'select'" class="select-arrow"></div>
     </div>
 
-    <div v-if="errorMessage" class="error-message" role="alert">
+    <div v-if="errorMessage" class="error-text" role="alert">
       {{ errorMessage }}
     </div>
 
@@ -225,7 +225,7 @@ function onBlur(event) {
   border-color: var(--danger-color);
 }
 
-.error-message {
+.error-text {
   color: var(--danger-color);
   font-size: var(--font-size-xs);
 }
