@@ -28,13 +28,7 @@
 import { BaseButton } from "../shared";
 import { sampleQuestions } from "../../store/modules/questions";
 
-defineProps({
-  isLoading: {
-    type: Boolean,
-    default: false
-  }
-});
-
+defineProps({ isLoading: Boolean });
 defineEmits(['load-sample', 'reset']);
 </script>
 
@@ -52,9 +46,7 @@ defineEmits(['load-sample', 'reset']);
 }
 
 h3 {
-  font-size: var(--font-size-lg);
-  color: var(--text-color);
-  margin-bottom: var(--spacing-md);
   font-weight: 600;
+  margin-bottom: var(--spacing-md);
 }
 </style> 

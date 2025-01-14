@@ -7,8 +7,8 @@
         type="textarea"
         :rows="6"
         readonly
-        :disabled="true"
-        :placeholder="'No question provided'"
+        disabled
+        placeholder="No question provided"
       />
     </div>
 
@@ -58,12 +58,10 @@ const props = defineProps({
   question: { 
     type: Object, 
     required: true,
-    validator: (value) => {
-      return value && typeof value.question === 'string';
-    }
+    validator: value => value && typeof value.question === 'string'
   },
-  previewMode: { type: Boolean, default: false },
-  disableQuestion: { type: Boolean, default: false }
+  previewMode: Boolean,
+  disableQuestion: Boolean
 });
 
 const emit = defineEmits(['submit']);
@@ -85,7 +83,6 @@ const {
 <style scoped>
 .player-container {
   display: grid;
-  grid-template-rows: auto auto auto auto;
   gap: var(--spacing-md);
   height: 100%;
   min-height: 0;
@@ -94,19 +91,13 @@ const {
 
 .question-section, .answer-section {
   display: grid;
-  grid-template-rows: auto 1fr;
   gap: var(--spacing-sm);
   min-height: 0;
 }
 
 h3 {
-  font-size: var(--font-size-md);
   font-weight: 600;
   color: var(--text-color);
-}
-
-:deep(textarea) {
-  composes: form-textarea from '../../assets/styles/components.css';
 }
 
 .actions {

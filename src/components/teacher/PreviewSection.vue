@@ -9,7 +9,7 @@
       >
         <template #preview-actions>
           <BaseButton
-            @click="handleAssign"
+            @click="$emit('assign')"
             :disabled="!canAssign"
             :loading="isLoading"
             block
@@ -27,18 +27,13 @@
 import { BaseButton } from "../shared";
 import Player from "../student/Player.vue";
 
-const props = defineProps({
+defineProps({
   question: { type: Object, required: true },
-  canAssign: { type: Boolean, default: false },
-  isLoading: { type: Boolean, default: false }
+  canAssign: Boolean,
+  isLoading: Boolean
 });
 
-const emit = defineEmits(['assign']);
-
-const handleAssign = () => {
-  localStorage.setItem('currentQuestion', JSON.stringify(props.question));
-  emit('assign');
-};
+defineEmits(['assign']);
 </script>
 
 <style scoped>
@@ -48,7 +43,6 @@ const handleAssign = () => {
   padding: var(--spacing-md);
   background: var(--surface-color);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
   height: 100%;
   overflow: hidden;
 }
@@ -57,20 +51,11 @@ h2 {
   font-size: var(--font-size-lg);
   font-weight: 600;
   margin-bottom: var(--spacing-md);
-  flex-shrink: 0;
 }
 
 .content {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   overflow-y: auto;
-}
-
-.content :deep(.player-container) {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 
 @media (max-width: 640px) {
